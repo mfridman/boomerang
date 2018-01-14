@@ -3,17 +3,18 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sync"
 	"time"
 
-	"golang.org/x/crypto/ssh"
-
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"golang.org/x/crypto/ssh"
 
 	"github.com/pkg/errors"
 
@@ -29,8 +30,30 @@ var VERSION = "undefined"
 type Boomerang struct {
 	MetaData Meta `json:"metadata"`
 
-	machineMu   sync.Mutex
+	machineMu   *sync.Mutex
 	MachineData []machine.Machine `json:"machine_data"`
+}
+
+func (b *Boomerang) writeJSON(w io.Writer) error {
+	by, err := json.Marshal(b)
+	if err != nil {
+		return errors.Wrap(err, "failed marshal")
+	}
+	if _, err := w.Write(by); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *Boomerang) writeIndentJSON(w io.Writer) error {
+	by, err := json.MarshalIndent(b, "", "\t")
+	if err != nil {
+		return errors.Wrap(err, "failed marshal")
+	}
+	if _, err := w.Write(by); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Meta structure holds all non machine-specific data
@@ -91,9 +114,10 @@ func main() {
 		MetaData: Meta{
 			BoomerangVersion: VERSION,
 			Type:             viper.GetString("Type"),
-			Timestamp:        output.TimeStamp.Format(time.RFC3339),
+			Timestamp:        viper.GetTime("ProgStartTime").Format(time.RFC3339),
 			TotalMachines:    len(inventory),
 		},
+		machineMu:   new(sync.Mutex),
 		MachineData: make([]machine.Machine, 0),
 	}
 
@@ -138,8 +162,41 @@ func main() {
 	elapsed := time.Since(pre.Start)
 
 	boomerang.MetaData.TotalTime = fmt.Sprintf("%v", elapsed-(elapsed%time.Millisecond))
-	if err := output.WriteJSON(boomerang); err != nil {
+
+	o := output.OutCfg{
+		Dir:        "raw",
+		FilePrefix: viper.GetString("PrefixJSON"), // default is raw
+		DateTime:   viper.GetTime("ProgStartTime"),
+	}
+
+	outFile, err := o.ToFile()
+	if err != nil {
 		log.Fatalln(err)
+	}
+
+	f, err := os.Create(outFile)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	switch viper.GetBool("IndentJSON") {
+	case true:
+		if err := boomerang.writeIndentJSON(f); err != nil {
+			log.Fatalln(err)
+		}
+	case false:
+		if err := boomerang.writeJSON(f); err != nil {
+			log.Fatalln(err)
+		}
+	}
+	if err := f.Close(); err != nil {
+		log.Fatalln(err)
+	}
+
+	errs := output.CleanUpExcept(o.Dir, outFile)
+	if len(errs) > 0 {
+		for _, e := range errs {
+			log.Printf("error cleaning up: %v\n", e)
+		}
 	}
 
 	output.Finished(&elapsed, len(inventory), len(boomerang.MachineData))

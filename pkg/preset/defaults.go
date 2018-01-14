@@ -1,6 +1,10 @@
 package preset
 
-import "github.com/spf13/viper"
+import (
+	"time"
+
+	"github.com/spf13/viper"
+)
 
 // setViperDefaults sets sensible defaults used throughout the program, and
 // registers aliases where necessary.
@@ -45,4 +49,5 @@ func setViperDefaults() {
 	viper.RegisterAlias("RetryWait", "retry_wait")
 	viper.SetDefault("RetryWait", 15)
 
+	viper.SetDefault("ProgStartTime", time.Now())
 }
