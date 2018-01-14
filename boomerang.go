@@ -192,10 +192,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	errs := output.CleanUpExcept(o.Dir, outFile)
-	if len(errs) > 0 {
-		for _, e := range errs {
-			log.Printf("error cleaning up: %v\n", e)
+	if viper.GetBool("KeepLatestFileOnly") {
+		errs := output.CleanUpExcept(o.Dir, outFile)
+		if len(errs) > 0 {
+			for _, e := range errs {
+				log.Printf("error cleaning up: %v\n", e)
+			}
 		}
 	}
 
