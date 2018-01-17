@@ -28,9 +28,7 @@ var VERSION = "undefined"
 
 // Boomerang is the parent struct written out as JSON to file
 type Boomerang struct {
-	MetaData Meta `json:"metadata"`
-
-	machineMu   *sync.Mutex
+	MetaData    Meta              `json:"metadata"`
 	MachineData []machine.Machine `json:"machine_data"`
 }
 
@@ -117,7 +115,6 @@ func main() {
 			Timestamp:        viper.GetTime("ProgStartTime").Format(time.RFC3339),
 			TotalMachines:    len(inventory),
 		},
-		machineMu:   new(sync.Mutex),
 		MachineData: make([]machine.Machine, 0),
 	}
 
@@ -132,6 +129,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(len(inventory))
 
+	var mut sync.Mutex
 	for _, ssh := range inventory {
 		go func(s machine.SSHInfo, rc machine.RunConfig) {
 
@@ -139,11 +137,11 @@ func main() {
 
 			finalMachine := m.Run(rc)
 
-			boomerang.machineMu.Lock()
+			mut.Lock()
 			{
 				boomerang.MachineData = append(boomerang.MachineData, *finalMachine)
 			}
-			boomerang.machineMu.Unlock()
+			mut.Unlock()
 
 			wg.Done()
 
