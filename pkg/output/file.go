@@ -1,7 +1,6 @@
 package output
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -28,13 +27,11 @@ func Finished(elapsed *time.Duration, machinesIn, machinesOut int) {
 // Will not panic in the even of an error cleaning up files(s),
 // instead the errors are stored in error slice and returned to caller.
 func CleanUpExcept(dirName string, files ...string) []error {
-	fmt.Println("FILES: ", files)
 	errs := make([]error, 0)
 
 	lookup := make(map[string]bool)
 	for _, f := range files {
 		_, name := filepath.Split(f)
-		fmt.Println(name)
 		lookup[name] = true
 	}
 
