@@ -69,8 +69,8 @@ config file consists of options and commands, all within a single file.
 
 - `inventory` is mandatory, [see above](#inventory)
 - should be explicit about authentication method. `agent`, `key` and `password` are supported.
-    - if using auth=password, must supply `password`
-    - if using auth=key, must supply `key_location`
+    - if using auth=password, must supply `SSHpassword`
+    - if using auth=key, must supply `privKeyLocation`
     - if using auth=agent, can supply custom env variable via `agent_ssh_auth`, default is `SSH_AUTH_SOCK`
 
 Full list of user options can be found [here](#available-options)
@@ -79,11 +79,11 @@ Example:
 
 ```yaml
 inventory: my_machines.json # or http://10.0.0.6/api/v1/machines
-connection_timeout: 5
 auth: key
-key_location: /Users/machine2b/.ssh/google_compute_engine
-keep_latest_file_only: true
-indent_json: true
+privKeyLocation: /Users/machine2b/.ssh/google_compute_engine
+connTimeout: 5
+keepLatestFile: true
+indentJSON: true
 ```
 
 ### Commands
@@ -138,18 +138,18 @@ With that understanding, you have 2 options:
 |---|---|---|---|
 |inventory|string||my_machines.json, http://10.0.0.6/api/v1/machines
 |auth|string||key\|agent\|password|
-|key_location|string||/home/user/id\_dsa|
+|privKeyLocation|string||/home/user/id\_dsa|
 |password|string||"superS3cret{r1ght}?;". If possible, use key or agent instead|
-|agent_ssh_auth|string|SSH_AUTH_SOCK||
+|agentSSHAuth|string|SSH_AUTH_SOCK||
 |__OPTIONAL__||||
-|connection_timeout|int|10||
-|type|string|""|displays in metadata|
-|host_key_check|bool|true|false\|true (see [known hosts](#known-hosts) section below)|
-|keep_latest_file_only|bool|false|false\|true, **Warning** if true will delete all existing .json files in raw folder and keep latest .json file only|
-|indent_json|bool|true|true\|false, if true will indent resulting JSON file|
-|json_prefix|string|raw|user can specify JSON filename prefix. json_prefix will be suffixed with `_yyyymmdd_hhmmss.json`. E.g, raw_20170506_173824.json|
+|connTimeout|int|10||
+|machineType|string|""|displays in metadata|
+|hostKeyCheck|bool|true|false\|true (see [known hosts](#known-hosts) section below)|
+|keepLatestFile|bool|false|false\|true, **Warning** if true will delete all existing .json files in raw folder and keep latest .json file only|
+|indentJSON|bool|true|true\|false, if true will indent resulting JSON file|
+|prefixJSON|string|raw|user can specify JSON filename prefix. json_prefix will be suffixed with `_yyyymmdd_hhmmss.json`. E.g, raw_20170506_173824.json|
 |retry|int|1||
-|retry_wait|int|15||
+|retryWait|int|15||
 
 # To Do
 
