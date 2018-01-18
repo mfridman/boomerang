@@ -4,7 +4,6 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -14,22 +13,14 @@ import (
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-	"golang.org/x/crypto/ssh"
 
 	"github.com/pkg/errors"
-
-	"github.com/mfridman/boomerang/pkg/machine"
-	"github.com/mfridman/boomerang/pkg/output"
-	pre "github.com/mfridman/boomerang/pkg/preset"
 )
-
-// VERSION holds the current version+build, which is defined at build time.
-var VERSION = "undefined"
 
 // Boomerang is the parent struct written out as JSON to file
 type Boomerang struct {
-	MetaData    Meta              `json:"metadata"`
-	MachineData []machine.Machine `json:"machine_data"`
+	MetaData    Meta      `json:"metadata"`
+	MachineData []Machine `json:"machine_data"`
 }
 
 func (b *Boomerang) writeJSON(w io.Writer) error {
@@ -66,43 +57,23 @@ type Meta struct {
 	TotalTime        string `json:"total_time"`
 }
 
+var (
+	version = pflag.Bool("version", false, "prints current version")
+	config  = pflag.String("c", "config", "specify config file")
+)
+
 func main() {
 
-	ver := pflag.Bool("version", false, "prints current version")
+	start := time.Now()
 
-	// set default config file name, otherwise user must specify via command line
-	pflag.String("config", "config", "override default config file")
+	log.SetOutput(os.Stdout)
+	log.SetFlags(0)
 
-	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
-	pflag.Parse()
-	viper.BindPFlags(pflag.CommandLine)
+	state, err := setup()
+	chkErr(err)
 
-	if *ver {
-		fmt.Println("Boomerang version", VERSION)
-		os.Exit(0)
-	}
-
-	if err := pre.ParseConfigFile(); err != nil {
-		log.Fatalln(errors.Wrap(err, "Fatal: Error config file setup"))
-	}
-
-	if !viper.IsSet("inventory") {
-		log.Fatalln("Error: config file is missing inventory option")
-	}
-
-	if err := pre.ValidateViperOptions(); err != nil {
-		log.Fatalln(errors.Wrap(err, "Fatal: Error validating options"))
-	}
-
-	authMethod, ok := viper.Get("userAuthMethod").(ssh.AuthMethod)
-	if !ok {
-		log.Fatalf("Fatal: Failed ssh.AuthMethod type assertion, got [%T] exepcting [ssh.AuthMethod]. Check valAuth()\n", viper.Get("userAuthMethod"))
-	}
-
-	inventory, err := machine.RetrieveInventory(viper.GetString("inventory"))
-	if err != nil {
-		log.Fatalln(err)
-	}
+	inventory, err := RetrieveInventory(state.inventory)
+	chkErr(err)
 
 	/*
 		boomerang gets populated throughout the main function and
@@ -110,20 +81,12 @@ func main() {
 	*/
 	boomerang := &Boomerang{
 		MetaData: Meta{
-			BoomerangVersion: VERSION,
-			Type:             viper.GetString("Type"),
-			Timestamp:        viper.GetTime("ProgStartTime").Format(time.RFC3339),
+			BoomerangVersion: VER,
+			Type:             state.machineType,
 			TotalMachines:    len(inventory),
+			Timestamp:        start.Format(time.RFC3339),
 		},
-		MachineData: make([]machine.Machine, 0),
-	}
-
-	runCfg := machine.RunConfig{
-		HostKeyCheck:   viper.GetBool("HostKeyCheck"),
-		ConnTimeout:    viper.GetInt64("ConnTimeout"),
-		UserAuthMethod: authMethod,
-		Retry:          viper.GetInt64("Retry"),
-		RetryWait:      viper.GetInt64("RetryWait"),
+		MachineData: make([]Machine, 0),
 	}
 
 	var wg sync.WaitGroup
@@ -131,9 +94,9 @@ func main() {
 
 	var mut sync.Mutex
 	for _, ssh := range inventory {
-		go func(s machine.SSHInfo, rc machine.RunConfig) {
+		go func(s SSHInfo, rc *State) {
 
-			m := machine.NewMachine(s)
+			m := NewMachine(s)
 
 			finalMachine := m.Run(rc)
 
@@ -145,7 +108,7 @@ func main() {
 
 			wg.Done()
 
-		}(ssh, runCfg)
+		}(ssh, state)
 	}
 
 	// block until all goroutines have completed.
@@ -157,14 +120,14 @@ func main() {
 		Items below deal with writing Boomerang to a JSON file in the ./raw directory
 	*/
 
-	elapsed := time.Since(pre.Start)
+	elapsed := time.Since(start)
 
 	boomerang.MetaData.TotalTime = fmt.Sprintf("%v", elapsed-(elapsed%time.Millisecond))
 
-	o := output.OutCfg{
+	o := OutCfg{
 		Dir:        "raw",
-		FilePrefix: viper.GetString("PrefixJSON"), // default is raw
-		DateTime:   viper.GetTime("ProgStartTime"),
+		FilePrefix: state.prefixJSON, // default is raw
+		DateTime:   start,
 	}
 
 	outFile, err := o.ToFile()
@@ -191,7 +154,7 @@ func main() {
 	}
 
 	if viper.GetBool("KeepLatestFileOnly") {
-		errs := output.CleanUpExcept(o.Dir, outFile)
+		errs := CleanUpExcept(o.Dir, outFile)
 		if len(errs) > 0 {
 			for _, e := range errs {
 				log.Printf("error cleaning up: %v\n", e)
@@ -199,5 +162,12 @@ func main() {
 		}
 	}
 
-	output.Finished(&elapsed, len(inventory), len(boomerang.MachineData))
+	Finished(&elapsed, len(inventory), len(boomerang.MachineData))
+}
+
+func chkErr(e error) {
+	if e != nil {
+		log.SetPrefix("Boomerang error:\n")
+		log.Fatalf("\t%v\n", e)
+	}
 }

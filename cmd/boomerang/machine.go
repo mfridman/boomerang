@@ -1,4 +1,4 @@
-package machine
+package main
 
 import (
 	"bytes"
@@ -14,10 +14,7 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	"github.com/mfridman/boomerang/pkg/auth"
 	"github.com/pkg/errors"
-
-	pre "github.com/mfridman/boomerang/pkg/preset"
 )
 
 // SSHInfo stores machine-specific information required for establishing an SSH connection.
@@ -203,18 +200,8 @@ func (m *Machine) Connect(conf *ssh.ClientConfig, retry, wait int64) (*ssh.Clien
 
 func (m *Machine) address() string { return m.HostName + ":" + m.Port }
 
-// A RunConfig structure is used to hold mandatory machineRun options.
-// Each goroutine gets its own config copy as viper items may not be safe for concurrency
-// TODO check viper and concurrency safety
-type RunConfig struct {
-	HostKeyCheck     bool
-	Retry, RetryWait int64
-	ConnTimeout      int64
-	UserAuthMethod   ssh.AuthMethod
-}
-
 // Run TODO comment
-func (m *Machine) Run(rc RunConfig) *Machine {
+func (m *Machine) Run(st *State) *Machine {
 	start := time.Now()
 
 	if m.HostName == "127.0.0.1" || m.HostName == "localhost" {
@@ -232,10 +219,10 @@ func (m *Machine) Run(rc RunConfig) *Machine {
 	}
 
 	var hostChecking ssh.HostKeyCallback
-	switch rc.HostKeyCheck {
+	switch st.hostKeyCheck {
 	case true:
 		// Every client must provide a host key check.
-		hostKey, err := auth.CheckHostKey(m.HostName, m.Port)
+		hostKey, err := checkHostKey(m.HostName, m.Port)
 		if err != nil {
 			m.Connection = false
 			m.RunLength = time.Since(start).Seconds()
@@ -249,12 +236,12 @@ func (m *Machine) Run(rc RunConfig) *Machine {
 
 	conf := &ssh.ClientConfig{
 		User:            m.Username,
-		Auth:            []ssh.AuthMethod{rc.UserAuthMethod},
+		Auth:            []ssh.AuthMethod{st.auth},
 		HostKeyCallback: hostChecking,
-		Timeout:         time.Duration(rc.ConnTimeout) * time.Second,
+		Timeout:         time.Duration(st.connTimeout) * time.Second,
 	}
 
-	client, err := m.Connect(conf, rc.Retry, rc.RetryWait)
+	client, err := m.Connect(conf, st.retry, st.retryWait)
 	if err != nil {
 		m.Connection = false
 		m.RunLength = time.Since(start).Seconds()
@@ -262,7 +249,7 @@ func (m *Machine) Run(rc RunConfig) *Machine {
 		return m
 	}
 
-	m.StreamData = executeCommands(client)
+	m.StreamData = executeCommands(client, st.commands)
 	m.Connection = true
 	m.RunLength = time.Since(start).Seconds()
 
@@ -287,18 +274,18 @@ func (m *Machine) setSSHPort() error {
 	return nil
 }
 
-func executeCommands(c *ssh.Client) []Stream {
+func executeCommands(client *ssh.Client, cs []command) []Stream {
 
 	var out []Stream
 
-	for _, cmd := range pre.CmdSlice {
+	for _, c := range cs {
 
 		sd := Stream{
-			Name:         cmd.Name,
+			Name:         c.name,
 			StreamErrors: make([]string, 0),
 		}
 
-		session, err := c.NewSession()
+		session, err := client.NewSession()
 		if err != nil {
 			sd.StreamErrors = append(sd.StreamErrors, fmt.Sprintf("error type=(%T): Failed to create NewSession: %v\n", errors.Cause(err), err))
 			sd.ExitCode = -1
@@ -311,7 +298,7 @@ func executeCommands(c *ssh.Client) []Stream {
 		session.Stdout = &stout
 		session.Stderr = &sterr
 
-		if err := session.Run(cmd.Command); err != nil {
+		if err := session.Run(c.cmd); err != nil {
 			switch e := err.(type) {
 			case *ssh.ExitError:
 				sd.StreamErrors = append(sd.StreamErrors, fmt.Sprintf("Command completed unsuccessfully: [%T]: %v", e, e.String()))
