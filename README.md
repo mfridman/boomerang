@@ -1,14 +1,12 @@
-`boomerang` executes a list of commands on many machines, concurrently, and return a JSON file recording Stdout & Stderr of each command. Written entirely in Go.
+`boomerang` executes a list of commands on many machines, concurrently, and returns a JSON file. Written entirely in Go.
 
 ## Brief
 
-The project needs a bit more work, refactoring and the API may change. But the code base is workable, e.g., able to execute dozens of commands on hundreds of machines concurrently. See [todo list](#to-do).
+The project needs a bit more work and the API may change. But the code base is workable, e.g., able to execute dozens of commands on hundreds of machines concurrently. See [todo list](#to-do).
 
-One could run `boomerang`, as a cron job, to gather data and feed it to a downstream importer or parser.
+One could run `boomerang` as a cron job to gather data and feed the resulting JSON file to a downstream parser.
 
-Accepts an [Inventory](#inventory), list of machines, from either a file or network.
-
-[commands](#commands) and [user-options](#user-options) are read from a single local config file.
+[options](#user-options) and [commands](#commands) are read from a single local config file.
 
 A typical project layout:
 
@@ -25,19 +23,82 @@ Note, `boomerang` will create its own `raw` directory.
 
 ## Installation
 
-    go get -u github.com/mfridman/boomerang
+This project aims to be a cli tool, hence the package layout.
+
+    go get -u github.com/mfridman/boomerang/cmd/boomerang
+
+## Config file
+
+File name should be config.yml and be located in the same directory as `boomerang`. Can override default via `--c` flag with a custom path and name.
+
+config file consists of options and commands, all within a single file.
+
+### User options
+
+- `inventory` is mandatory, [see below](#inventory)
+- should be explicit about authentication method. `agent`, `key` and `password` are supported.
+    - if using auth=password, must supply `SSHpassword` option
+    - if using auth=key, must supply `privKeyLocation` option
+    - if using auth=agent, can supply custom env variable via `agentSSHAuth`, otherwise defaults to `SSH_AUTH_SOCK`
+
+Full list of user options can be found [here](#available-options)
+
+Example:
+
+```yaml
+inventory: my_machines.json # or http://10.0.0.6/api/v1/machines
+auth: key
+privKeyLocation: /Users/machine2b/.ssh/google_compute_engine
+connTimeout: 10
+keepLatestFile: true
+indentJSON: true
+```
+
+### Commands
+
+- Commands are run sequentially, by design, and must be specified as a YAML list of key/value pairs.
+
+```yaml
+commands:
+    - uptime: /usr/bin/uptime
+    - ubuntu_version: 
+```
+
+Sample output:
+
+```json
+stream_data: [
+    {
+        "name": "uptime",
+        "stdout": "23:45:20 up 128 days, 12:50,  0 users,  load average: 0.08, 0.13, 0.09",
+        "stderr": "",
+        "exit_code": 0,
+        "stream_errors": []
+    },
+    {
+        "name": "ubuntu_version",
+        "stdout": "Description:\tUbuntu 16.04.2 LTS",
+        "stderr": "",
+        "exit_code": 0,
+        "stream_errors": []
+    }
+]
+```
 
 ## Inventory
 
 `boomerang` builds a list of machines as specified by `inventory` (a mandatory [config file](#config-file) option), can be:
 
-1.  a file name in the same directory as `boomerang`: my_machines.json
-2.  an absolute path: /etc/boomerang/inventory.json
-3.  a network address, e.g., https://example.com/dev_servers/api or http://10.0.0.6/api/v1/machines  
+1.  a file in the same directory as `boomerang` 
+    - my_machines.json
+2.  an absolute path
+    - /etc/boomerang/inventory.json
+3.  a network address
+    - https://example.com/dev_servers/api or http://10.0.0.6/api/v1/machines  
 
 Inventory is an array of machine objects, where each machine object contains:
 
-- `username` and `hostname` are mandatory fields
+- `username` and `hostname`, both are mandatory fields
 - `ssh_port` accepts 1-65535; blank defaults to port 22
 - `extras` is optional and will be written out as is to final JSON. Can be used to record machine-specific metadata, e.g., name, location, id.
 
@@ -55,56 +116,6 @@ Inventory is an array of machine objects, where each machine object contains:
             "name": "ubuntu16-media",
             "location": "home"
         }
-    }
-]
-```
-
-## Config file
-
-File name should be config (or `config.yaml`) and be located in the same directory as `boomerang`. Can also supply config file via `--config` flag, okay to use custom name and location.
-
-config file consists of options and commands, all within a single file.
-
-### User options
-
-- `inventory` is mandatory, [see above](#inventory)
-- should be explicit about authentication method. `agent`, `key` and `password` are supported.
-    - if using auth=password, must supply `SSHpassword`
-    - if using auth=key, must supply `privKeyLocation`
-    - if using auth=agent, can supply custom env variable via `agent_ssh_auth`, default is `SSH_AUTH_SOCK`
-
-Full list of user options can be found [here](#available-options)
-
-Example:
-
-```yaml
-inventory: my_machines.json # or http://10.0.0.6/api/v1/machines
-auth: key
-privKeyLocation: /Users/machine2b/.ssh/google_compute_engine
-connTimeout: 5
-keepLatestFile: true
-indentJSON: true
-```
-
-### Commands
-
-- Commands are run sequentially (by design), and must be specified as a YAML list of key/value pairs.
-
-```yaml
-commands:
-    - uptime: /usr/bin/uptime
-```
-
-Sample output:
-
-```json
-[
-    {
-        "name": "uptime",
-        "stdout": "17:03:19 up 142 days,  3:06,  0 users,  load average: 0.63, 0.50, 0.46",
-        "stderr": "",
-        "exit_code": 0,
-        "stream_errors": []
     }
 ]
 ```
