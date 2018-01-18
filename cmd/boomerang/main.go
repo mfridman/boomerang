@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 
 	"github.com/pkg/errors"
 )
@@ -130,7 +129,7 @@ func main() {
 		DateTime:   start,
 	}
 
-	outFile, err := o.ToFile()
+	outFile, err := o.toFile()
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -139,7 +138,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	switch viper.GetBool("IndentJSON") {
+	switch state.indentJSON {
 	case true:
 		if err := boomerang.writeIndentJSON(f); err != nil {
 			log.Fatalln(err)
@@ -153,8 +152,8 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	if viper.GetBool("KeepLatestFileOnly") {
-		errs := CleanUpExcept(o.Dir, outFile)
+	if state.keepLatestFile {
+		errs := cleanUpExcept(o.Dir, outFile)
 		if len(errs) > 0 {
 			for _, e := range errs {
 				log.Printf("error cleaning up: %v\n", e)
@@ -162,7 +161,7 @@ func main() {
 		}
 	}
 
-	Finished(&elapsed, len(inventory), len(boomerang.MachineData))
+	finished(&elapsed, len(inventory), len(boomerang.MachineData))
 }
 
 func chkErr(e error) {

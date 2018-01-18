@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/spf13/viper"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 )
@@ -21,7 +20,7 @@ import (
 // if using auth=agent, default is SSH_AUTH_SOCK.
 func setAuth(a authOpt) (ssh.AuthMethod, error) {
 
-	switch viper.GetString("Auth") {
+	switch a.auth {
 	case "key":
 		// check existence of private key in config file
 		pk := a.key
