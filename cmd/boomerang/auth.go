@@ -15,7 +15,7 @@ import (
 
 // setAuth accepts auth options and attempts converts auth to an ssh.AuthMethod.
 // Supports key, agent or password.
-// If using auth=key must supply privKey,
+// If using auth=key must supply privKeyLocation,
 // If using auth=password must supply password.
 // if using auth=agent, default is SSH_AUTH_SOCK.
 func setAuth(a authOpt) (ssh.AuthMethod, error) {
@@ -25,7 +25,7 @@ func setAuth(a authOpt) (ssh.AuthMethod, error) {
 		// check existence of private key in config file
 		pk := a.key
 		if pk == "" {
-			return nil, errors.New("must include privKey when auth=key")
+			return nil, errors.New("must include privKeyLocation when auth=key")
 		}
 
 		signer, err := getPrivKey(pk) // get private key

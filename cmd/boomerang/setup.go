@@ -74,13 +74,13 @@ type State struct {
 	configFile       string         // mandatory
 	inventory        string         // mandatory
 	auth             ssh.AuthMethod // mandatory
-	privKey          string         // conditional
+	privKeyLocation  string         // conditional
 	SSHpassword      string         // conditional
 	agentSSHAuth     string
 	machineType      string
 	prefixJSON       string
-	connTimeout      int64
-	retry, retryWait int64
+	connTimeout      int64 // TODO, convert this to duration
+	retry, retryWait int64 // TODO, convert this to duration
 	hostKeyCheck     bool
 	keepLatestFile   bool
 	indentJSON       bool
@@ -120,7 +120,7 @@ func (s *State) importFromViper() error {
 
 	opts := authOpt{
 		auth:  viper.GetString("auth"),
-		key:   viper.GetString("privKey"),
+		key:   viper.GetString("privKeyLocation"),
 		pass:  viper.GetString("SSHpassword"),
 		agent: viper.GetString("agentSSHAuth"),
 	}
