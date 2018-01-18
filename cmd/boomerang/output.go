@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Finished writes to console upon completion
-func Finished(elapsed *time.Duration, machinesIn, machinesOut int) {
+// finished writes to console upon completion
+func finished(elapsed *time.Duration, machinesIn, machinesOut int) {
 	log.Printf("Boomerang completed in %v. input: %v output: %v\n",
 		*elapsed-(*elapsed%time.Millisecond),
 		machinesIn,
@@ -21,7 +21,7 @@ func Finished(elapsed *time.Duration, machinesIn, machinesOut int) {
 // File arguments can be just a name or a absolute path + name.
 // Will not panic in the even of an error cleaning up files(s),
 // instead the errors are stored in error slice and returned to caller.
-func CleanUpExcept(dirName string, files ...string) []error {
+func cleanUpExcept(dirName string, files ...string) []error {
 	errs := make([]error, 0)
 
 	lookup := make(map[string]bool)
@@ -55,13 +55,13 @@ func CleanUpExcept(dirName string, files ...string) []error {
 	return errs
 }
 
-type OutCfg struct {
+type outCfg struct {
 	Dir        string
 	FilePrefix string
 	DateTime   time.Time
 }
 
-func (o OutCfg) ToFile() (string, error) {
+func (o outCfg) toFile() (string, error) {
 	filename := o.FilePrefix + "_" + o.DateTime.Format("20060102_150405") + ".json"
 
 	// Check if Dir exists. Create, if necessary, in the current working directory.

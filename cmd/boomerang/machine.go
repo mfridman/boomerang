@@ -48,8 +48,8 @@ type Stream struct {
 	StreamErrors []string `json:"stream_errors"`
 }
 
-// NewMachine returns a pointer to an initialized Machine struct.
-func NewMachine(s SSHInfo) *Machine {
+// newMachine returns a pointer to an initialized Machine struct.
+func newMachine(s SSHInfo) *Machine {
 	m := Machine{
 		ConnectionErrors: make([]string, 0),
 		StreamData:       make([]Stream, 0),
@@ -70,7 +70,7 @@ func NewMachine(s SSHInfo) *Machine {
 // If supplying a filename, it must be located in the same directory as Boomerang.
 // Otherwise must supply the full path to the file. Avoid file names with the prefix
 // http or https.
-func RetrieveInventory(l string) ([]SSHInfo, error) {
+func retrieveInventory(l string) ([]SSHInfo, error) {
 
 	re, err := regexp.Compile(`^(http|https)://`)
 	if err != nil {
@@ -141,7 +141,7 @@ func fileExists(f string) bool {
 	return !os.IsNotExist(err)
 }
 
-// Connect is a wrapper around ssh.Dial using TCP.
+// connect is a wrapper around ssh.Dial using TCP.
 //
 // Although ssh.ClientConfig supports a zero timeout, i.e., no timeout, it's recommended to include
 // a timeout to prevent Boomerang from hanging indefintely. A successful client connection may still get
@@ -152,7 +152,7 @@ func fileExists(f string) bool {
 // (ssh.ClientConfig.Timeout + wait)s.
 //
 // The deadline is the total number of seconds Boomerang will spend trying to connect.
-func (m *Machine) Connect(conf *ssh.ClientConfig, retry, wait int64) (*ssh.Client, error) {
+func (m *Machine) connect(conf *ssh.ClientConfig, retry, wait int64) (*ssh.Client, error) {
 
 	if conf.Timeout == 0 {
 		client, err := ssh.Dial("tcp", m.address(), conf)
@@ -201,7 +201,7 @@ func (m *Machine) Connect(conf *ssh.ClientConfig, retry, wait int64) (*ssh.Clien
 func (m *Machine) address() string { return m.HostName + ":" + m.Port }
 
 // Run TODO comment
-func (m *Machine) Run(st *State) *Machine {
+func (m *Machine) run(st *State) *Machine {
 	start := time.Now()
 
 	if m.HostName == "127.0.0.1" || m.HostName == "localhost" {
@@ -241,7 +241,7 @@ func (m *Machine) Run(st *State) *Machine {
 		Timeout:         time.Duration(st.connTimeout) * time.Second,
 	}
 
-	client, err := m.Connect(conf, st.retry, st.retryWait)
+	client, err := m.connect(conf, st.retry, st.retryWait)
 	if err != nil {
 		m.Connection = false
 		m.RunLength = time.Since(start).Seconds()

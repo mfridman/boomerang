@@ -71,7 +71,7 @@ func main() {
 	state, err := setup()
 	chkErr(err)
 
-	inventory, err := RetrieveInventory(state.inventory)
+	inventory, err := retrieveInventory(state.inventory)
 	chkErr(err)
 
 	/*
@@ -95,9 +95,9 @@ func main() {
 	for _, ssh := range inventory {
 		go func(s SSHInfo, rc *State) {
 
-			m := NewMachine(s)
+			m := newMachine(s)
 
-			finalMachine := m.Run(rc)
+			finalMachine := m.run(rc)
 
 			mut.Lock()
 			{
@@ -123,7 +123,7 @@ func main() {
 
 	boomerang.MetaData.TotalTime = fmt.Sprintf("%v", elapsed-(elapsed%time.Millisecond))
 
-	o := OutCfg{
+	o := outCfg{
 		Dir:        "raw",
 		FilePrefix: state.prefixJSON, // default is raw
 		DateTime:   start,
