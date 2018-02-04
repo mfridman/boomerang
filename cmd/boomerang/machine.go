@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"golang.org/x/crypto/ssh"
 
 	"github.com/pkg/errors"
+	"github.com/pkg/sftp"
 )
 
 // SSHInfo stores machine-specific information required for establishing an SSH connection.
@@ -249,7 +251,27 @@ func (m *Machine) run(st *State) *Machine {
 		return m
 	}
 
-	m.StreamData = executeCommands(client, st.commands)
+	// upload files
+	if len(st.uploads) > 0 {
+
+		var sftpClient *sftp.Client
+
+		if sftpClient, err = sftp.NewClient(client); err != nil {
+			m.Connection = false
+			m.RunLength = time.Since(start).Seconds()
+			m.ConnectionErrors = []string{fmt.Sprint(errors.Wrap(err, "failed to establish sftp client"))}
+			return m
+		}
+		s := executeUploads(sftpClient, st.uploads)
+		m.StreamData = append(m.StreamData, s...)
+	}
+
+	// execute commands
+	if len(st.commands) > 0 {
+		s := executeCommands(client, st.commands)
+		m.StreamData = append(m.StreamData, s...)
+	}
+
 	m.Connection = true
 	m.RunLength = time.Since(start).Seconds()
 
@@ -314,6 +336,53 @@ func executeCommands(client *ssh.Client, cs []command) []Stream {
 
 		sd.Stdout = strings.TrimSpace(stout.String())
 		sd.Stderr = strings.TrimSpace(sterr.String())
+
+		out = append(out, sd)
+	}
+
+	return out
+}
+
+func executeUploads(sfc *sftp.Client, up []upload) []Stream {
+
+	var out []Stream
+
+	for _, u := range up {
+
+		sd := Stream{
+			Name:         fmt.Sprintf("Uploading: %v", u.filename),
+			StreamErrors: make([]string, 0),
+		}
+
+		file := filepath.Join(u.dest, u.filename)
+
+		if !u.overwrite {
+			// check remote file existence
+			if _, err := sfc.Lstat(filepath.Join(u.dest, u.filename)); !os.IsNotExist(err) {
+				sd.Stderr = fmt.Sprintf("File exists and overwrite set to false: %v", file)
+				sd.ExitCode = -1
+				out = append(out, sd)
+				continue
+			}
+		}
+
+		dst, err := sfc.Create(file)
+		if err != nil {
+			sd.StreamErrors = append(sd.StreamErrors, fmt.Sprintf("Failed to create %v on remote server: %v", file, err))
+			sd.ExitCode = -1
+			out = append(out, sd)
+			continue
+		}
+
+		if _, err := dst.Write(u.content); err != nil {
+			sd.StreamErrors = append(sd.StreamErrors, fmt.Sprintf("Failed writing content to remote file: %v", err))
+			sd.ExitCode = -1
+			out = append(out, sd)
+			continue
+		}
+		dst.Close()
+
+		sd.Stdout = fmt.Sprintf("File successfully uploaded: %v", file)
 
 		out = append(out, sd)
 	}

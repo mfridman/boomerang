@@ -2,3 +2,5 @@ vendor/
 raw/
 config
 ignore/
+.gitignore
+vbckp/

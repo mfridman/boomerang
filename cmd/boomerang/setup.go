@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -85,6 +87,15 @@ type State struct {
 	keepLatestFile   bool
 	indentJSON       bool
 	commands         []command
+	uploads          []upload
+}
+
+type upload struct {
+	src       string
+	dest      string
+	filename  string
+	content   []byte
+	overwrite bool
 }
 
 type command struct {
@@ -153,6 +164,14 @@ func (s *State) importFromViper() error {
 	}
 	s.commands = v
 
+	u := viper.Get("uploads")
+
+	up, ok := u.([]upload)
+	if !ok {
+		return errors.New("could not assert upload list")
+	}
+	s.uploads = up
+
 	return nil
 }
 
@@ -179,6 +198,63 @@ func readConfig(f string) error {
 		return err
 	}
 
+	if err := parseUploads(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func parseUploads() error {
+
+	var in [][]string
+
+	var out []upload
+
+	if !viper.InConfig("uploads") {
+		return nil
+	}
+
+	if err := viper.UnmarshalKey("uploads", &in); err != nil {
+		return errors.Wrap(err, "unable to unmarshal uploads into struct")
+	}
+
+	for _, u := range in {
+		if len(u) < 2 {
+			log.Println("Upload must have: source_file, target_file and an optional third arg -f")
+			continue
+		}
+
+		f, err := os.Open(u[0])
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		by, err := ioutil.ReadAll(f)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+		f.Close()
+
+		var o bool
+		if len(u) > 2 && u[2] == "-f" {
+			o = true
+		}
+
+		out = append(out, upload{
+			src:       u[0],
+			dest:      u[1],
+			filename:  filepath.Base(u[0]),
+			content:   by,
+			overwrite: o,
+		})
+
+	}
+
+	viper.Set("uploads", out)
+
 	return nil
 }
 
@@ -189,15 +265,11 @@ func parseCommands() error {
 	out := make([]command, 0)
 
 	if !viper.InConfig("commands") {
-		return errors.New("could not find commands key in config file")
+		return nil
 	}
 
 	if err := viper.UnmarshalKey("commands", &i); err != nil {
 		return errors.Wrap(err, "unable to unmarshal commands into struct")
-	}
-
-	if len(i) == 0 {
-		return errors.New("no commands specified in config file")
 	}
 
 	for _, m := range i {
@@ -215,10 +287,6 @@ func parseCommands() error {
 				continue
 			}
 		}
-	}
-
-	if len(out) == 0 {
-		return errors.New("could not generate list of commands from config file")
 	}
 
 	viper.Set("commands", out)
