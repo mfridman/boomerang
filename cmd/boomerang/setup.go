@@ -156,21 +156,23 @@ func (s *State) importFromViper() error {
 	s.keepLatestFile = viper.GetBool("keepLatestFile")
 	s.indentJSON = viper.GetBool("indentJSON")
 
-	c := viper.Get("commands")
-
-	v, ok := c.([]command)
-	if !ok {
-		return errors.New("could not assert command list")
+	if viper.IsSet("commands") {
+		c := viper.Get("commands")
+		v, ok := c.([]command)
+		if !ok {
+			return errors.New("could not assert command list")
+		}
+		s.commands = v
 	}
-	s.commands = v
 
-	u := viper.Get("uploads")
-
-	up, ok := u.([]upload)
-	if !ok {
-		return errors.New("could not assert upload list")
+	if viper.IsSet("uploads") {
+		u := viper.Get("uploads")
+		up, ok := u.([]upload)
+		if !ok {
+			return errors.New("could not assert upload list")
+		}
+		s.uploads = up
 	}
-	s.uploads = up
 
 	return nil
 }
