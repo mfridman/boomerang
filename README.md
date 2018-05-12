@@ -61,7 +61,7 @@ indentJSON: true
 ```yaml
 commands:
     - uptime: /usr/bin/uptime
-    - ubuntu_version: 
+    - ubuntu_version: lsb_release -d
 ```
 
 Sample output:
@@ -150,7 +150,7 @@ With that understanding, you have 2 options:
 |inventory|string||my_machines.json, http://10.0.0.6/api/v1/machines
 |auth|string||key\|agent\|password|
 |privKeyLocation|string||/home/user/id\_dsa|
-|password|string||"superS3cret{r1ght}?;". If possible, use key or agent instead|
+|SSHpassword|string||"superS3cret{r1ght}?;". If possible, use key or agent instead|
 |agentSSHAuth|string|SSH_AUTH_SOCK||
 |__OPTIONAL__||||
 |connTimeout|int|10||
