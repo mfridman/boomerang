@@ -1,4 +1,4 @@
-`boomerang` executes a list of commands on many machines, concurrently, and returns a JSON file. Written entirely in Go.
+`boomerang` executes a list of *nix commands on many machines, concurrently, and returns a JSON file. Written entirely in Go.
 
 ## Brief
 
